@@ -55,9 +55,9 @@ namespace lab_2 {
 				b_k = y_k;
 				y_k = x_k;
 				f_y = f_x;
-				x_k =  a_k + (1 - TAU) * (b_k - a_k);
+				x_k = a_k + (1 - TAU) * (b_k - a_k);
 				f_x = f(x_k);
- 			}
+			}
 			k++;
 		}
 		return (a_k + b_k) / 2;
@@ -84,7 +84,7 @@ namespace lab_2 {
 		double y_k = a_k + (F[n - k] / F[n - k + 1]) * (b_k - a_k);
 		double f_x = f(x_k);
 		double f_y = f(y_k);
-		while (k < n - 1){
+		while (k < n - 1) {
 			if (f_x > f_y) {
 				a_k = x_k;
 				//b_k = b_k;
@@ -116,7 +116,7 @@ namespace lab_2 {
 				b_k = y_n;
 			}
 			return (a_k + b_k) / 2;
-		} 
+		}
 
 	}
 
@@ -124,7 +124,7 @@ namespace lab_2 {
 
 
 	void test_golden() {
-		std::cout << golden_ratio(f,-1, 1, 0.01) << std::endl;
+		std::cout << golden_ratio(f, -1, 1, 0.01) << std::endl;
 	}
 
 
@@ -139,37 +139,75 @@ namespace lab_2 {
 
 namespace lab_3 {
 	struct Point {
-		double x1;
-		double x2;
+		std::vector<double> coor;
 
-		Point(double a, double b) : x1(a), x2(b) {};
+		Point(const std::vector<double>& temp) : coor(temp) {};
+		Point(int n, const std::vector<double>& temp) :  coor(temp) {};
+		Point(double a, double b) : coor({a,b}) {};
 
-		Point operator+(const Point& other) const {
-			return { x1 + other.x1, x2 + other.x2 };
-		}
+		Point() = default;
+
+		
+		//Point operator-(const Point& other) const {
+		//	return { x1 - other.x1, x2 - other.x2 };
+		//}
 
 		Point operator-(const Point& other) const {
-			return { x1 - other.x1, x2 - other.x2 };
-		}
+			auto temp = coor;
+			for (int i = 0; i < coor.size(); ++i) {
+				temp[i] = coor[i] - other.coor[i];
+			}
 
-		Point operator-() const {
-			return { -x1, -x2 };
+			return temp;
 		}
 
 		Point operator*(double num) const {
-			return { num * x1, num * x2 };
+			auto temp = coor;
+			for (size_t i = 0; i < coor.size() ; i++) {
+				temp[i] *= num;
+			}
+			return temp;
+
+			
+
+		}
+
+		double operator[](size_t index) {
+			return coor[index];
+		}
+
+		Point operator+(const Point& other) const {
+			auto temp = coor;
+			for (int i = 0; i < coor.size(); ++i) {
+				temp[i] = coor[i] + other.coor[i];
+			}
+
+			return temp;
 		}
 
 		friend Point operator*(double scalar, const Point& p) {
-			return { scalar * p.x1, scalar * p.x2 };
+			auto val = p.coor;
+			for (size_t i = 0; i < p.coor.size(); ++i) {
+				val[i] *= scalar;
+			}
+			return val;
 		}
 
 		double dot(const Point& other) const {
-			return x1 * other.x1 + x2 * other.x2;
+			//return x1 * other.x1 + x2 * other.x2;
+			double val = 0;
+			for (size_t i = 0; i < coor.size(); ++i) {
+				val += coor[i] * other.coor[i];
+			}
+			return val;
 		}
 
 		double product() const {
-			return x1 * x1 + x2 * x2;
+			double val = 0;
+			for (size_t i = 0; i < coor.size(); ++i) {
+				val += coor[i] * coor[i];
+			}
+			return val;
 		}
 
 		double norm() const {
@@ -178,11 +216,11 @@ namespace lab_3 {
 	};
 
 	double f(const Point& p) {
-		return std::exp(3 * p.x1) + std::pow(p.x1 + p.x2, 2) + std::exp(2* p.x2);
+		return std::exp(3 * p.coor[0]) + std::pow(p.coor[0] + p.coor[1], 2) + std::exp(2 * p.coor[1]);
 	}
 
 	Point grad_f(const Point& p) {
-		return { 3 * std::exp(3 * p.x1) + 2 * (p.x1 + p.x2), 2 * (p.x1 + p.x2) + 2 * std::exp(2 * p.x2) };
+		return {3 * std::exp(3 * p.coor[0]) + 2 * (p.coor[0] + p.coor[1]) , 2 * (p.coor[0] + p.coor[1]) + 2 * std::exp(2 * p.coor[1]) };
 	}
 
 	Point grad_armijo(Point& p, double (*f)(const Point&), Point(*grad_f)(const Point&),
@@ -190,7 +228,8 @@ namespace lab_3 {
 	{
 		Point x_k = p;
 		long long k = 0;
-
+		Point z = grad_f(x_k);
+		double zz = z.norm();
 		while (grad_f(x_k).norm() > eps) {
 			k += 1;
 			double alpha_k = alpha;
@@ -198,35 +237,37 @@ namespace lab_3 {
 			Point grad = grad_f(x_k);
 			while (f(x_k - alpha_k * grad) > f(x_k) - gamma * alpha_k * grad.dot(grad)) {
 				alpha_k *= theta;
-				
+
 			}
-			
+
 			x_k = x_k - alpha_k * grad;
 		}
-		std::cout << 'K = ' << k << ' ';
+		std::cout << "K = " << k << ' ';
 		return x_k;
 	}
 
 	void test_dif_params() {
-		Point x0(1.0, 1.0);
+		Point x0(1, 1);
 
+		Point z = grad_f(x0);
+		double zz = z.norm();
 		std::cout << "Standart TEST" << std::endl;
 		auto result = grad_armijo(x0, f, grad_f, 1, 0.5, 0.5, 0.01);
-		std::cout << result.x1 << " " << result.x2 << std::endl;
-		
-		
+		std::cout << result.coor[0] << " " << result.coor[1] << std::endl;
+
+
 		std::cout << "changing alpha" << std::endl;
 		std::vector<double> alphas = { 1.0, 0.5, 0.1, 0.01 };
 		for (auto kent : alphas) {
 			auto result = grad_armijo(x0, f, grad_f, kent, 0.5, 0.5, 0.01);
-			std::cout << "#" << kent << "# " << result.x1 << " " << result.x2 << std::endl;
+			std::cout << "#" << kent << "# " << result.coor[0] << " " << result.coor[1] << std::endl;
 		}
 
 		std::cout << "changing gamma" << std::endl;
 		std::vector<double> gammas = { 0.1, 0.3, 0.5, 0.7 };
 		for (auto kent : gammas) {
 			auto result = grad_armijo(x0, f, grad_f, 1, kent, 0.5, 0.01);
-			std::cout << "#" << kent << "# " << result.x1 << " " << result.x2 << std::endl;
+			std::cout << "#" << kent << "# " << result.coor[0] << " " << result.coor[1] << std::endl;
 		}
 
 
@@ -234,11 +275,11 @@ namespace lab_3 {
 		std::vector<double> thetas = { 0.1, 0.3, 0.4, 0.5, 0.8 };
 		for (auto kent : thetas) {
 			auto result = grad_armijo(x0, f, grad_f, 1, 0.5, kent, 0.01);
-			std::cout << "#" << kent << "# " << result.x1 << " " << result.x2 << std::endl;
+			std::cout << "#" << kent << "# " << result.coor[0] << " " << result.coor[1] << std::endl;
 		}
 
-		
-		
+
+
 
 
 	}
@@ -260,26 +301,26 @@ namespace lab_4 {
 			k++;
 
 			Point grad = grad_f(x_k);
-
-			auto F_alpha = [&grad, &x_k, &f](double alpha) -> double {
+			/*
+			auto F_alpha = [&](double alpha) -> double {
 				Point z = x_k - alpha * grad;
 				return f(z);
-				};
+			};*/
 
-			double alpha_k = golden_ratio(F_alpha, 0, alpha_max, eps);
+			double alpha_k = golden_ratio([&](double alpha) -> double { Point z = x_k - alpha * grad; return f(z);}, 0, alpha_max, eps);
 
 			x_k = x_k - alpha_k * grad;
 		}
-		std::cout << 'K = ' << k << ' ';
+		std::cout << "K = " << k << ' ';
 		return x_k;
 	}
 
 
 	void test() {
-		lab_3::Point x0(1.0, 1.0);
+		lab_3::Point x0(1, 1);
 		std::cout << "GRAD_FAStER" << std::endl;
 		auto result = lab_4::grad_faster(x0, lab_3::f, lab_3::grad_f, 0.01);
-		std::cout << result.x1 << " " << result.x2  << std::endl;
+		std::cout << result.coor[0] << " " << result.coor[1] << std::endl;
 	}
 }
 
