@@ -7,6 +7,7 @@
 double EPS = 0.01;
 double TAU = (std::sqrt(5) - 1) / 2;
 
+using namespace std;
 
 
 namespace lab_2 {
@@ -133,21 +134,17 @@ namespace lab_2 {
 	}
 }
 
-
-
-
-
 namespace lab_3 {
 	struct Point {
 		std::vector<double> coor;
 
 		Point(const std::vector<double>& temp) : coor(temp) {};
-		Point(int n, const std::vector<double>& temp) :  coor(temp) {};
-		Point(double a, double b) : coor({a,b}) {};
+		Point(int n, const std::vector<double>& temp) : coor(temp) {};
+		Point(double a, double b) : coor({ a,b }) {};
 
 		Point() = default;
 
-		
+
 		//Point operator-(const Point& other) const {
 		//	return { x1 - other.x1, x2 - other.x2 };
 		//}
@@ -163,12 +160,12 @@ namespace lab_3 {
 
 		Point operator*(double num) const {
 			auto temp = coor;
-			for (size_t i = 0; i < coor.size() ; i++) {
+			for (size_t i = 0; i < coor.size(); i++) {
 				temp[i] *= num;
 			}
 			return temp;
 
-			
+
 
 		}
 
@@ -220,7 +217,7 @@ namespace lab_3 {
 	}
 
 	Point grad_f(const Point& p) {
-		return {3 * std::exp(3 * p.coor[0]) + 2 * (p.coor[0] + p.coor[1]) , 2 * (p.coor[0] + p.coor[1]) + 2 * std::exp(2 * p.coor[1]) };
+		return { 3 * std::exp(3 * p.coor[0]) + 2 * (p.coor[0] + p.coor[1]) , 2 * (p.coor[0] + p.coor[1]) + 2 * std::exp(2 * p.coor[1]) };
 	}
 
 	Point grad_armijo(Point& p, double (*f)(const Point&), Point(*grad_f)(const Point&),
@@ -285,7 +282,6 @@ namespace lab_3 {
 	}
 }
 
-
 namespace lab_4 {
 	using namespace lab_3;
 	using namespace lab_2;
@@ -324,15 +320,191 @@ namespace lab_4 {
 	}
 }
 
+namespace lab_5{
+
+	using namespace lab_2;
+    class Point {
+    public:
+        vector<double> coor;
+
+        Point(const vector<double>& temp = {}) : coor(temp) {};
+        Point(double a, double b, double c) : coor({ a, b, c }) {};
+
+        Point operator-(const Point& other) const {
+            vector<double> temp;
+            for (size_t i = 0; i < coor.size(); ++i) {
+                temp.push_back(coor[i] - other.coor[i]);
+            }
+            return Point(temp);
+        }
+
+        Point operator+(const Point& other) const {
+            vector<double> temp;
+            for (size_t i = 0; i < coor.size(); ++i) {
+                temp.push_back(coor[i] + other.coor[i]);
+            }
+            return Point(temp);
+        }
+
+        Point operator*(double num) const {
+            vector<double> temp;
+            for (size_t i = 0; i < coor.size(); ++i) {
+                temp.push_back(coor[i] * num);
+            }
+            return Point(temp);
+        }
+
+        friend Point operator*(double scalar, const Point& p) {
+            return p * scalar;
+        }
+
+        double operator[](size_t index) const {
+            return coor[index];
+        }
+
+        double dot(const Point& other) const {
+            double val = 0;
+            for (size_t i = 0; i < coor.size(); ++i) {
+                val += coor[i] * other.coor[i];
+            }
+            return val;
+        }
+
+        double norm() const {
+            return sqrt(dot(*this));
+        }
+
+        void print() const {
+            cout << "(";
+            for (size_t i = 0; i < coor.size(); ++i) {
+                cout << coor[i];
+                if (i < coor.size() - 1) cout << ", ";
+            }
+            cout << ")";
+        }
+    };
+
+    class QuadraticFunction {
+    private:
+        vector<vector<double>> A;
+        vector<double> b;
+        double c;
+
+    public:
+        QuadraticFunction(const vector<vector<double>>& A_, const vector<double>& b_, double c_) : A(A_), b(b_), c(c_) {}
+
+        double operator()(const Point& x) const {
+            return 0.5 * multiplyAx(x).dot(x) + Point(b).dot(x) + c;
+        }
+        Point multiplyAx(const Point& x) const {
+            vector<double> result(A.size(), 0.0);
+            for (size_t i = 0; i < A.size(); ++i) {
+                for (size_t j = 0; j < A[i].size(); ++j) {
+                    result[i] += A[i][j] * x[j];
+                }
+            }
+            return Point(result);
+        }
+
+        Point gradient(const Point& x) const {
+            return multiplyAx(x) + Point(b);
+        }
+
+        const vector<vector<double>>& getA() const { return A; }
+        const vector<double>& getB() const { return b; }
+        double getC() const { return c; }
+    };
+
+
+    Point fletcher_reeves_exactly(const QuadraticFunction& f, const Point& x0, double eps = 0.01) {
+        Point x = x0;
+        Point grad = f.gradient(x);
+        Point d = grad * (-1); 
+
+        int k = 0;
+
+        while (grad.norm() > eps) {
+            
+            Point Ad = f.multiplyAx(d);
+            double alpha = grad.dot(grad) / d.dot(Ad);
+
+            x = x + d * alpha;
+            Point grad_prev = grad;
+
+            grad = f.gradient(x);
+
+            double omega = grad.dot(grad) / grad_prev.dot(grad_prev);
+
+
+            d = grad * (-1) + d * omega;
+
+            k++;
+
+        }
+		std::cout << "$" << k << "$$";
+        return x;
+    }
+
+    Point fletcher_reeves_approx(const QuadraticFunction& f, const Point& x0, double eps = 0.01) {
+        Point x = x0;
+        Point grad = f.gradient(x);
+        Point d = grad * (-1); 
+
+        int k = 0;
+
+        while (grad.norm() > eps) {
+
+            double alpha = golden_ratio([&](double alpha) -> double {return f(x + d * alpha);}, 0, 1, eps);
+
+            x = x + d * alpha;
+
+            Point grad_prev = grad;
+
+            grad = f.gradient(x);
+
+            double beta = grad.dot(grad) / grad_prev.dot(grad_prev);
+
+            d = grad * (-1) + d * beta;
+
+            k++;
+        }
+
+		std::cout << "$" << k << "$$";
+        return x;
+    }
+
+    void test() {
+        vector<vector<double>> A = {
+            {1, 1, 1},
+            {1, 1.5, 1},
+            {1, 1, 2.5}
+        };
+        vector<double> b = { 1, -2, -3 };
+        double c = 7;
+        QuadraticFunction f(A, b, c);
+        Point x0(0, 0, 0);
+  
+        cout << "\nEXACTLy FOR ARE YOU LOOKING FOR" << endl;
+        Point result_exact = fletcher_reeves_exactly(f, x0, EPS);
+        cout << "ans:";
+        result_exact.print();
+
+        cout << "\n ~~~~~~~~~~~~~~~~~~~~~~~~~" << endl;
+        Point result_approx = fletcher_reeves_approx(f, x0, EPS);
+        cout << "ans: ";
+        result_approx.print();
+    }
+}
 
 
 int main() {
 	//std::cout << TAU;
 	//lab_2::test_golden();
 	//lab_2::test_fib();
-	lab_3::test_dif_params();
-	std::cout << std::endl;
-	lab_4::test();
+	//lab_3::test_dif_params();
+	//std::cout << std::endl;
+	//lab_4::test();
+	lab_5::test();  
 
 	return 0;
 }
