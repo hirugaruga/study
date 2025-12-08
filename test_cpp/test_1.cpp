@@ -420,3 +420,559 @@ int main() {
 }
 
 
+#include <iostream>
+#include <optional>
+#include <stack>
+#include <random>
+
+namespace problem_one {
+
+}
+
+namespace problem_two {
+
+    template <typename Key, typename Data>
+    class binary_search_tree
+    {
+        struct node
+        {
+            Key key;
+            Data data;
+            node* left = nullptr, * right = nullptr;
+        } *root = nullptr;
+        size_t count = 0;
+        
+        //находит адрес указателя, который должен указывать на узел с ключом k
+
+        node** _find(const Key& k) const
+        {
+            node** p = (node**)&root;
+            while (*p and (*p)->key != k)
+                p = (*p)->key < k ? &((*p)->right) : &((*p)->left);
+            return p;
+        }
+
+        size_t h_rec(node* n)
+        {
+            if (n == nullptr) return 0;
+
+            size_t left_h = h_rec(n->left);
+            size_t right_h = h_rec(n->right);
+
+            return 1 + (left_h > right_h ? left_h : right_h);
+        }
+
+
+    public:
+        binary_search_tree() {}
+        ~binary_search_tree()
+        {
+            node* current = root;
+            std::stack<node*> s;
+            while (current || s.size())
+            {
+                if (current)
+                {
+                    s.push(current);
+                    current = current->left;
+                }
+                else
+                {
+                    current = s.top()->right;
+                    delete s.top();
+                    s.pop();
+                }
+            }
+        }
+
+        binary_search_tree(const binary_search_tree& other) : root(nullptr), count(0)
+        {
+            if (!other.root) return;
+
+            root = new node{ other.root->key, other.root->data };
+            ++count;
+
+            std::stack<node*> s1;
+            std::stack<node*> s2;
+            s1.push(other.root);
+            s2.push(root);
+
+            while (!s1.empty())
+            {
+                auto src = s1.top();
+                s1.pop();
+                auto dst = s2.top();
+                s2.pop();
+
+                if (src->left)
+                {
+                    dst->left = new node{ src->left->key, src->left->data };
+                    ++count;
+                    s1.push(src->left);
+                    s2.push(dst->left);
+                }
+                if (src->right)
+                {
+                    dst->right = new node{ src->right->key, src->right->data };
+                    ++count;
+                    s1.push(src->right);
+                    s2.push(dst->right);
+                }
+            }
+        }
+    
+        binary_search_tree& operator=(const binary_search_tree& other)
+        {
+            if (this == &other) return *this;
+            
+            binary_search_tree temp(other);
+            std::swap(root, temp.root);
+            std::swap(count, temp.count);
+            return *this;
+        }
+
+        binary_search_tree& operator=(binary_search_tree&& other)
+        {
+            swap(*this, other);
+            return *this;
+        }
+
+        binary_search_tree(binary_search_tree&& other) : root(other.root), count(other.count)
+        {
+            other.root = nullptr;
+            other.count = 0;
+        }
+
+        bool operator==(const binary_search_tree& other) const
+        {
+            if (count != other.count) return false;
+
+            std::stack<node*> s1, s2;
+            node* current1 = root;
+            node* current2 = other.root;
+
+            while ((current1 || !s1.empty()) && (current2 || !s2.empty()))
+            {
+                while (current1)
+                {
+                    s1.push(current1);
+                    current1 = current1->left;
+                }
+                while (current2)
+                {
+                    s2.push(current2);
+                    current2 = current2->left;
+                }
+                current1 = s1.top(); s1.pop();
+                current2 = s2.top(); s2.pop();
+
+                if (current1->key != current2->key || current1->data != current2->data)
+                    return false;
+
+                current1 = current1->right;
+                current2 = current2->right;
+            }
+            return (current1 == nullptr && s1.empty() && current2 == nullptr && s2.empty());
+        }
+
+
+
+        std::optional<Data> find(const Key& k) const
+        {
+            auto p = _find(k);
+            return *p == nullptr ? std::nullopt : std::optional<Data>((*p)->data);
+        }
+        void insert(const Key& k, const Data& d)
+        {
+            auto p = _find(k);
+            if (*p)
+                (*p)->data = d;
+            else
+            {
+                *p = new node{ k,d };
+                ++count;
+            }
+        }
+        std::optional<Key> findnext(const Key& k)const
+        {
+            node** p = (node**)&root, ** lastleft = nullptr;
+            while (*p)
+                p = k < (*p)->key ? (lastleft = p, &((*p)->left)) : &((*p)->right);
+            return lastleft ? std::optional<Key>((*lastleft)->key) : std::nullopt;
+        }
+        void remove(const Key& k)
+        {
+            auto p = _find(k);
+            if (*p == nullptr) return;
+            if ((*p)->left == nullptr || (*p)->right == nullptr)
+            {
+                auto to_delete = *p;
+                *p = (*p)->left == nullptr ? (*p)->right : (*p)->left;
+                delete to_delete;
+            }
+            else
+            {
+                node** cur = &((*p)->right);
+                while ((*cur)->left)
+                    cur = &((*cur)->left);
+                auto to_delete = *cur;
+                (*p)->key = to_delete->key;
+                (*p)->data = to_delete->data;
+                *cur = (*cur)->right;
+                delete to_delete;
+            }
+            --count;
+        }
+        void remove_alt(const Key& k)
+        {
+            auto p = _find(k);
+            if (*p == nullptr) return;
+            --count;
+            static std::random_device rd;
+            static std::mt19937_64 mtrand(rd());
+            static std::uniform_int_distribution<> dist(0, 1);
+            auto a = (*p)->left, b = (*p)->right;
+            delete* p; 
+            while (a && b)
+            {
+                if (dist(mtrand))
+                {
+                    *p = a;
+                    p = &(a->right);
+                    a = a->right;
+                }
+                else
+                {
+                    *p = b;
+                    p = &(b->left);
+                    b = b->left;
+                }
+            }
+            if (a) *p = a;
+            else *p = b;
+        }
+
+
+        friend void swap(binary_search_tree& a, binary_search_tree& b) {
+            std::swap(a.root, b.root);
+            std::swap(a.count, b.count);
+        
+        }
+
+        size_t hi_rec() {
+            return h_rec(root);
+        }
+        size_t hi__non_rec() {
+            
+        }
+        
+    };
+
+    void test()
+    {
+        binary_search_tree<int, std::string> T;
+        T.insert(45, "one");
+        T.insert(35, "two");
+        T.insert(22, "three");
+        T.insert(67, "four");
+        T.insert(95, "five");
+        T.insert(54, "six");
+        T.insert(50, "seven");
+        T.insert(52, "eight");
+        T.insert(70, "nine");
+        T.insert(73, "ten");
+        T.insert(68, "eleven");
+        T.remove_alt(50);
+        std::cout << *T.findnext(49) << std::endl;
+        std::cout << "Hello World!\n";
+
+        binary_search_tree<int, std::string> t1 = T;
+        std::cout << *t1.findnext(49) << std::endl;
+
+        std::cout << (t1 == T) << std::endl;
+        std::cout << t1.hi_rec()<< std::endl;
+    }
+}
+
+int main()
+{
+    problem_two::test();
+}
+
+#include <iostream>
+#include <optional>
+#include <stack>
+#include <random>
+
+namespace problem_one {
+
+}
+
+namespace problem_two {
+
+    template <typename Key, typename Data>
+    class binary_search_tree
+    {
+        struct node
+        {
+            Key key;
+            Data data;
+            node* left = nullptr, * right = nullptr;
+        } *root = nullptr;
+        size_t count = 0;
+        
+        //находит адрес указателя, который должен указывать на узел с ключом k
+
+        node** _find(const Key& k) const
+        {
+            node** p = (node**)&root;
+            while (*p and (*p)->key != k)
+                p = (*p)->key < k ? &((*p)->right) : &((*p)->left);
+            return p;
+        }
+
+        size_t h_rec(node* n)
+        {
+            if (n == nullptr) return 0;
+
+            size_t left_h = h_rec(n->left);
+            size_t right_h = h_rec(n->right);
+
+            return 1 + (left_h > right_h ? left_h : right_h);
+        }
+
+
+    public:
+        binary_search_tree() {}
+        ~binary_search_tree()
+        {
+            node* current = root;
+            std::stack<node*> s;
+            while (current || s.size())
+            {
+                if (current)
+                {
+                    s.push(current);
+                    current = current->left;
+                }
+                else
+                {
+                    current = s.top()->right;
+                    delete s.top();
+                    s.pop();
+                }
+            }
+        }
+
+        binary_search_tree(const binary_search_tree& other) : root(nullptr), count(0)
+        {
+            if (!other.root) return;
+
+            root = new node{ other.root->key, other.root->data };
+            ++count;
+
+            std::stack<node*> s1;
+            std::stack<node*> s2;
+            s1.push(other.root);
+            s2.push(root);
+
+            while (!s1.empty())
+            {
+                auto src = s1.top();
+                s1.pop();
+                auto dst = s2.top();
+                s2.pop();
+
+                if (src->left)
+                {
+                    dst->left = new node{ src->left->key, src->left->data };
+                    ++count;
+                    s1.push(src->left);
+                    s2.push(dst->left);
+                }
+                if (src->right)
+                {
+                    dst->right = new node{ src->right->key, src->right->data };
+                    ++count;
+                    s1.push(src->right);
+                    s2.push(dst->right);
+                }
+            }
+        }
+    
+        binary_search_tree& operator=(const binary_search_tree& other)
+        {
+            if (this == &other) return *this;
+            
+            binary_search_tree temp(other);
+            std::swap(root, temp.root);
+            std::swap(count, temp.count);
+            return *this;
+        }
+
+        binary_search_tree& operator=(binary_search_tree&& other)
+        {   
+            std::swap(root, other->root);
+            std::swap(count, other->count);
+            //std::swap(*this, other);
+            return *this;
+        }
+
+        binary_search_tree(binary_search_tree&& other) : root(other.root), count(other.count)
+        {
+            other.root = nullptr;
+            other.count = 0;
+        }
+
+        bool operator==(const binary_search_tree& other) const
+        {
+            if (count != other.count) return false;
+
+            std::stack<node*> s1, s2;
+            node* current1 = root;
+            node* current2 = other.root;
+
+            while ((current1 || !s1.empty()) && (current2 || !s2.empty()))
+            {
+                while (current1)
+                {
+                    s1.push(current1);
+                    current1 = current1->left;
+                }
+                while (current2)
+                {
+                    s2.push(current2);
+                    current2 = current2->left;
+                }
+                current1 = s1.top(); s1.pop();
+                current2 = s2.top(); s2.pop();
+
+                if (current1->key != current2->key || current1->data != current2->data)
+                    return false;
+
+                current1 = current1->right;
+                current2 = current2->right;
+            }
+            return (current1 == nullptr && s1.empty() && current2 == nullptr && s2.empty());
+        }
+
+
+
+        std::optional<Data> find(const Key& k) const
+        {
+            auto p = _find(k);
+            return *p == nullptr ? std::nullopt : std::optional<Data>((*p)->data);
+        }
+        void insert(const Key& k, const Data& d)
+        {
+            auto p = _find(k);
+            if (*p)
+                (*p)->data = d;
+            else
+            {
+                *p = new node{ k,d };
+                ++count;
+            }
+        }
+        std::optional<Key> findnext(const Key& k)const
+        {
+            node** p = (node**)&root, ** lastleft = nullptr;
+            while (*p)
+                p = k < (*p)->key ? (lastleft = p, &((*p)->left)) : &((*p)->right);
+            return lastleft ? std::optional<Key>((*lastleft)->key) : std::nullopt;
+        }
+        void remove(const Key& k)
+        {
+            auto p = _find(k);
+            if (*p == nullptr) return;
+            if ((*p)->left == nullptr || (*p)->right == nullptr)
+            {
+                auto to_delete = *p;
+                *p = (*p)->left == nullptr ? (*p)->right : (*p)->left;
+                delete to_delete;
+            }
+            else
+            {
+                node** cur = &((*p)->right);
+                while ((*cur)->left)
+                    cur = &((*cur)->left);
+                auto to_delete = *cur;
+                (*p)->key = to_delete->key;
+                (*p)->data = to_delete->data;
+                *cur = (*cur)->right;
+                delete to_delete;
+            }
+            --count;
+        }
+        void remove_alt(const Key& k)
+        {
+            auto p = _find(k);
+            if (*p == nullptr) return;
+            --count;
+            static std::random_device rd;
+            static std::mt19937_64 mtrand(rd());
+            static std::uniform_int_distribution<> dist(0, 1);
+            auto a = (*p)->left, b = (*p)->right;
+            delete* p; 
+            while (a && b)
+            {
+                if (dist(mtrand))
+                {
+                    *p = a;
+                    p = &(a->right);
+                    a = a->right;
+                }
+                else
+                {
+                    *p = b;
+                    p = &(b->left);
+                    b = b->left;
+                }
+            }
+            if (a) *p = a;
+            else *p = b;
+        }
+
+
+        size_t hi_rec() {
+            return h_rec(root);
+        }
+        size_t hi__non_rec() {
+            
+        }
+        
+    };
+
+    void test()
+    {
+        binary_search_tree<int, std::string> T;
+        T.insert(45, "one");
+        T.insert(35, "two");
+        T.insert(22, "three");
+        T.insert(67, "four");
+        T.insert(95, "five");
+        T.insert(54, "six");
+        T.insert(50, "seven");
+        T.insert(52, "eight");
+        T.insert(70, "nine");
+        T.insert(73, "ten");
+        T.insert(68, "eleven");
+        T.remove_alt(50);
+        std::cout << *T.findnext(49) << std::endl;
+        std::cout << "Hello World!\n";
+
+        binary_search_tree<int, std::string> t1 = T;
+        std::cout << *t1.findnext(49) << std::endl;
+
+        std::cout << (t1 == T) << std::endl;
+        std::cout << t1.hi_rec()<< std::endl;
+    }
+}
+
+int main()
+{
+    problem_two::test();
+}
+
+
+
