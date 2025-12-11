@@ -9,7 +9,6 @@ double TAU = (std::sqrt(5) - 1) / 2;
 
 using namespace std;
 
-
 namespace lab_2 {
 	double f(double x) {
 		return std::exp(x * x + x) + std::exp(x * x + 1);
@@ -328,6 +327,7 @@ namespace lab_5{
         vector<double> coor;
 
         Point(const vector<double>& temp = {}) : coor(temp) {};
+        Point(double a, double b) : coor({ a, b}) {};
         Point(double a, double b, double c) : coor({ a, b, c }) {};
 
         Point operator-(const Point& other) const {
@@ -496,15 +496,314 @@ namespace lab_5{
     }
 }
 
+namespace lab_6 {
+    using namespace lab_2;
+    using namespace lab_5;
+
+    Point matrix_vector_mult(const vector<vector<double>>& M, const Point& v) {
+        size_t n = M.size();
+        vector<double> result(n, 0);
+        for (size_t i = 0; i < n; ++i) {
+            for (size_t j = 0; j < M[i].size(); ++j) {
+                result[i] += M[i][j] * v[j];
+            }
+        }
+        return Point(result);
+    }
+
+    vector<vector<double>> matrix_mult(vector<vector<double>>& A,
+        vector<vector<double>>& B) {
+        size_t n = A.size();
+        size_t m = B[0].size();
+        size_t p = B.size();
+
+        vector<vector<double>> result(n, vector<double>(m, 0));
+
+        for (size_t i = 0; i < n; ++i) {
+            for (size_t j = 0; j < m; ++j) {
+                for (size_t k = 0; k < p; ++k) {
+                    result[i][j] += A[i][k] * B[k][j];
+                }
+            }
+        }
+        return result;
+    }
+
+    vector<vector<double>> transpose(const vector<vector<double>>& M) {
+        size_t n = M.size();
+        size_t m = M[0].size();
+
+        vector<vector<double>> result(m, vector<double>(n, 0));
+
+        for (size_t i = 0; i < n; ++i) {
+            for (size_t j = 0; j < m; ++j) {
+                result[j][i] = M[i][j];
+            }
+        }
+        return result;
+    }
+  
+    void print_matrix(const vector<vector<double>>& M, const string& name = "") {
+        if (!name.empty()) {
+            cout << name << ":" << endl;
+        }
+
+        for (auto& row : M) {
+            cout << "[ ";
+            for (double val : row) {
+                cout << val << " ";
+            }
+            cout << "]" << endl;
+        }
+        cout << endl;
+    }
+
+
+    vector<vector<double>> inverse_matrix(const vector<vector<double>>& H) {
+        double a = H[0][0], b = H[0][1];
+        double c = H[1][0], d = H[1][1];
+
+        double det = a * d - b * c;
+        if (abs(det) < 1e-10) {
+            return { {1, 0}, {0, 1} };
+        }
+
+        vector<vector<double>> inv(2, vector<double>(2));
+        inv[0][0] = d / det;
+        inv[0][1] = -b / det;
+        inv[1][0] = -c / det;
+        inv[1][1] = a / det;
+
+        return inv;
+    }
+    
+    double ff(const Point& p) {
+        double x1 = p[0];
+        double x2 = p[1];
+        return exp(3 * x1) + pow(x1 + x2, 2) + exp(2 * x2);
+    }
+	
+    Point grad_f(const Point& p) {
+        double x1 = p[0];
+        double x2 = p[1];
+        double g1 = 3 * exp(3 * x1) + 2 * (x1 + x2);
+        double g2 = 2 * (x1 + x2) + 2 * exp(2 * x2);
+        return Point(g1, g2);
+    }
+
+
+
+    vector<vector<double>> hessian(const Point& p) {
+        double x1 = p[0];
+        double x2 = p[1];
+
+        vector<vector<double>> H(2, vector<double>(2));
+        H[0][0] = 9 * exp(3 * x1) + 2;
+        H[0][1] = 2;
+        H[1][0] = 2;
+        H[1][1] = 2 + 4 * exp(2 * x2);
+
+        return H;
+    }
+
+    Point newton_raphson(const Point& x0, double (*ff)(const  Point&), double eps = 0.01) {
+        Point x_k = x0;
+        int k = 0;
+        Point grad = grad_f(x_k);
+        double grad_norm = grad.norm();
+
+        while (grad_norm > eps) {
+
+
+            vector<vector<double>> H = hessian(x_k);
+
+            double det = H[0][0] * H[1][1] - H[0][1] * H[1][0];
+
+
+           // if (abs(det) < 1e-10) {
+            //    double alpha_k = golden_ratio([&](double alpha) -> double { return ff(x_k - alpha * grad); }, 0, 1, eps);
+            //    x_k = x_k - alpha_k * grad;
+            //}
+           // else {
+			vector<vector<double>> H_inv = inverse_matrix(H);
+
+			Point newton_dir = matrix_vector_mult(H_inv, grad);
+
+
+			double alpha_k = golden_ratio([&](double alpha) -> double {
+                    return ff(x_k - alpha * newton_dir);
+                    }, 0, 1, eps);
+			x_k = x_k - alpha_k * newton_dir;
+
+            grad = grad_f(x_k);
+            grad_norm = grad.norm();
+
+            k++;
+			
+			std::cout << grad_norm  << "@" << x_k[0] << " " << x_k[1] << "\n";
+        }
+        return x_k;
+    }
+
+    void test() {
+        Point x0(0, 0);
+        Point result = newton_raphson(x0, ff, 0.01);
+
+        cout << result[0] << " " << result[1] <<  endl;
+
+    }
+}
+
+
+namespace lab_7 {
+    using namespace lab_2;
+    using namespace lab_5;
+    using namespace lab_6;
+
+    double fff(const Point& p) {
+        double x1 = p[0];
+        double x2 = p[1];
+        return exp(3 * x1) + pow(x1 + x2, 2) + exp(2 * x2);
+    }
+
+    Point grad_f(const Point& p) {
+        double x1 = p[0];
+        double x2 = p[1];
+        double g1 = 3 * exp(3 * x1) + 2 * (x1 + x2);
+        double g2 = 2 * (x1 + x2) + 2 * exp(2 * x2);
+        return Point(g1, g2);
+    }
+    vector<vector<double>> matrix_add(const vector<vector<double>>& A, const vector<vector<double>>& B) {
+        size_t n = A.size();
+        size_t m = A[0].size();
+
+        vector<vector<double>> result(n, vector<double>(m, 0));
+
+        for (size_t i = 0; i < n; ++i) {
+            for (size_t j = 0; j < m; ++j) {
+                result[i][j] = A[i][j] + B[i][j];
+            }
+        }
+
+        return result;
+    }
+
+    vector<vector<double>> matrix_mult_scalar(const vector<vector<double>>& M, double scalar) {
+        size_t n = M.size();
+        size_t m = M[0].size();
+
+        vector<vector<double>> result(n, vector<double>(m, 0));
+
+        for (size_t i = 0; i < n; ++i) {
+            for (size_t j = 0; j < m; ++j) {
+                result[i][j] = M[i][j] * scalar;
+            }
+        }
+
+        return result;
+    }
+
+    //(u * v^T)
+    vector<vector<double>> outer_product(const Point& u, const Point& v) {
+        size_t n = u.coor.size();
+        vector<vector<double>> result(n, vector<double>(n, 0));
+
+        for (size_t i = 0; i < n; ++i) {
+            for (size_t j = 0; j < n; ++j) {
+                result[i][j] = u[i] * v[j];
+            }
+        }
+
+        return result;
+    }
+
+    vector<vector<double>> rank_one_correction(const vector<vector<double>>& D, const Point& delta_x, const Point& delta_g) {
+
+        Point u = delta_x - matrix_vector_mult(D, delta_g);
+
+        double denominator = u.dot(delta_g);
+
+        if (abs(denominator) < 1e-10) {
+
+            return D;
+        }
+
+        //(u * u^T) / (u^T * delta(g))
+        vector<vector<double>> correction = outer_product(u, u);
+        correction = matrix_mult_scalar(correction, 1.0 / denominator);
+
+        return correction;
+    }
+
+
+    Point quasi_newton_rank_one(const Point& x0, double (*fff)(const  Point&), double eps = 0.01) {
+        Point x_k = x0;
+        int k = 0;
+
+        size_t n = x_k.coor.size();
+        vector<vector<double>> D(n, vector<double>(n, 0));
+        for (size_t i = 0; i < n; ++i) {
+            D[i][i] = 1;
+        }
+
+
+        Point grad_prev = grad_f(x_k);
+        double grad_norm = grad_prev.norm();
+
+        while (grad_norm > eps) {
+            
+            Point direction = matrix_vector_mult(D, grad_prev);
+
+            double alpha_k = golden_ratio([&](double alpha) -> double { return fff(x_k - alpha * direction); }, 0, 1, eps);
+
+            Point x_prev = x_k;
+            Point grad_prev_before = grad_prev;
+
+            
+            x_k = x_k - alpha_k * direction;
+
+
+            Point grad_new = grad_f(x_k);
+            grad_norm = grad_new.norm();
+
+
+            Point delta_x = x_k - x_prev;
+            Point delta_g = grad_new - grad_prev_before;
+
+
+            vector<vector<double>> correction = rank_one_correction(D, delta_x, delta_g);
+            D = matrix_add(D, correction);
+
+            grad_prev = grad_new;
+
+            k++;
+        }
+
+        return x_k;
+    }
+
+    void test() {
+       
+        Point x0(0.5, 0.5);
+
+        Point result = quasi_newton_rank_one(x0,fff,EPS);
+        cout  << result[0] << " " << result[1]  << endl;
+
+    }
+}
 
 int main() {
+
 	//std::cout << TAU;
 	//lab_2::test_golden();
 	//lab_2::test_fib();
 	//lab_3::test_dif_params();
 	//std::cout << std::endl;
 	//lab_4::test();
-	lab_5::test();  
+	//lab_5::test();
+	lab_6::test();
+	lab_7::test();
 
 	return 0;
+
 }
